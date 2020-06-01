@@ -30,17 +30,11 @@ namespace Quickstart.Tests.IntegrationTests
             // runs in a Process & listens on the port specified in launchSettings.json
             IdentityServerWrapper = GetWebAppWrapper(srcDir, testsDir, "IdentityServer");
 
-            // create an HttpClient for IdentityServer
-            IdentityServerHttpClient = new HttpClient();
-
             // Web API setup
 
             // wrap all parameters, publish and start the Api web app -
             // runs in a Process & listens on the port specified in launchSettings.json
             WebApiWrapper = GetWebAppWrapper(srcDir, testsDir, "Api");
-
-            // create an HttpClient for IdentityServer
-            WebApiHttpClient = new HttpClient();
         }
 
         public void Dispose()
@@ -79,7 +73,7 @@ namespace Quickstart.Tests.IntegrationTests
             return wrapper;
         }
 
-        private void Setup(WebAppWrapper webAppWrapper)
+        public void Setup(WebAppWrapper webAppWrapper)
         {
             // ensure nothing is running on the port
             ProcManager.KillByPort(webAppWrapper.HttpsPort);
@@ -91,7 +85,7 @@ namespace Quickstart.Tests.IntegrationTests
             webAppWrapper.ProcWrapper = PublishAndRun(webAppWrapper);
         }
 
-        private void Teardown(WebAppWrapper webAppWrapper)
+        public void Teardown(WebAppWrapper webAppWrapper)
         {
             // (we don't delete the output here in case the tester wants to look at the logs)
 
@@ -120,6 +114,18 @@ namespace Quickstart.Tests.IntegrationTests
             var processWrapper = ProcManager.RunWebApp(parms.ProjectPath, parms.OutputPath, parms.UriString);
 
             return processWrapper;
+        }
+
+        public void RestartIdentityServer()
+        {
+            // restart IdentityServer - creates a new process after it's been killed by child tests
+            IdentityServerWrapper.ProcWrapper = ProcManager.RunWebApp(IdentityServerWrapper.ProjectPath, IdentityServerWrapper.OutputPath, IdentityServerWrapper.UriString);
+        }
+
+        public void RestartWebApi()
+        {
+            // restart IdentityServer - creates a new process after it's been killed by child tests
+            WebApiWrapper.ProcWrapper = ProcManager.RunWebApp(WebApiWrapper.ProjectPath, WebApiWrapper.OutputPath, WebApiWrapper.UriString);
         }
     }
 }

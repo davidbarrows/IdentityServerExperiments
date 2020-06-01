@@ -1,64 +1,86 @@
-﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
-
-using IdentityModel.Client;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Net.Http;
+﻿using System;
 using System.Threading.Tasks;
+using Client.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 
 namespace Client
 {
     public class Program
     {
-        private static async Task Main()
+        private static async Task<int> Main()
         {
-            // dB note 21/05/2020 -
-            // this is the original sample file from the Quickstart.  This has been converted to integration tests in my example.
+            // dB notes 21/05/2020 - 29/05/2020
+            // this started life as the original sample file from the IdentityServer4 Quickstart.
+            // This has been converted to integration tests in my example;
+            // but now I've also refactored it to make it more testable;
+            // created a couple of services and an 'orchestrator' class to call them
 
-            // discover endpoints from metadata
-            var client = new HttpClient();
-
-            var disco = await client.GetDiscoveryDocumentAsync("https://localhost:5001");
-            if (disco.IsError)
+            var loggerFactory = LoggerFactory.Create(loggingBuilder =>
             {
-                Console.WriteLine(disco.Error);
-                return;
-            }
-
-            // request token
-            var tokenResponse = await client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
-            {
-                Address = disco.TokenEndpoint,
-                ClientId = "client",
-                ClientSecret = "secret",
-
-                Scope = "api1"
+                loggingBuilder
+                    .AddFilter("Microsoft", LogLevel.Warning)
+                    .AddFilter("System", LogLevel.Warning)
+                    .AddFilter("LoggingConsoleApp.Program", LogLevel.Debug)
+                    .AddConsole();
             });
 
-            if (tokenResponse.IsError)
+            var logger = loggerFactory.CreateLogger<Program>();
+            logger.LogInformation("Starting client application");
+
+            var hostBuilder = new HostBuilder()
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddHttpClient("identityServer", c =>
+                    {
+                        // TODO:  configure for IdentityServer -
+                        // the Quickstart specifies no BaseAddress, etc
+                    });
+                    
+                    services.AddHttpClient("api", c =>
+                    {
+                        // TODO:  configure for the API - 
+                        // same as above
+                    });
+
+                    services.AddTransient<IApiClientService, ApiClientService>();
+                    services.AddTransient<ISecurityService, SecurityService>();
+                    services.AddLogging();
+                }).UseConsoleLifetime();
+
+            var host = hostBuilder.Build();
+
+            using (var serviceScope = host.Services.CreateScope())
             {
-                Console.WriteLine(tokenResponse.Error);
-                return;
+                var serviceProvider = serviceScope.ServiceProvider;
+
+                try
+                {
+                    var apiClientService = serviceProvider.GetService<IApiClientService>();
+                    var securityService = serviceProvider.GetService<ISecurityService>();
+                    var orchestrator = new ClientOrchestrator(securityService, apiClientService, logger);
+
+                    await orchestrator.Execute();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "An error occurred.");
+                }
             }
 
-            Console.WriteLine(tokenResponse.Json);
-            Console.WriteLine("\n\n");
 
-            // call api
-            var apiClient = new HttpClient();
-            apiClient.SetBearerToken(tokenResponse.AccessToken);
 
-            var response = await apiClient.GetAsync("https://localhost:6001/identity");
-            if (!response.IsSuccessStatusCode)
-            {
-                Console.WriteLine(response.StatusCode);
-            }
-            else
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                Console.WriteLine(JArray.Parse(content));
-            }
+
+
+            
+
+
+
+
+            
+            return 0;
+
         }
     }
 }
