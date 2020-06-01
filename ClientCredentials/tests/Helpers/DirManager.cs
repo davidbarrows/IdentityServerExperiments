@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
 namespace Quickstart.Tests.Helpers
 {
@@ -21,12 +22,26 @@ namespace Quickstart.Tests.Helpers
             }
         }
 
+        // note - this can still fail if, for example, you have the folder open in Windows Explorer or some other process still has the folder locked.
+        // see:  https://stackoverflow.com/questions/329355/cannot-delete-directory-with-directory-deletepath-true
         public static void DeleteDirectory(DirectoryInfo dir)
         {
             if (!dir.Exists) return;
 
             SetAttributesNormal(dir);
-            dir.Delete(true);
+            
+            try
+            {
+                dir.Delete(true);
+            }
+            catch (IOException)
+            {
+                dir.Delete(true);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                dir.Delete(true);
+            }
         }
 
         // see:  https://stackoverflow.com/questions/1701457/directory-delete-doesnt-work-access-denied-error-but-under-windows-explorer-it
